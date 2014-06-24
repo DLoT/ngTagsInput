@@ -224,7 +224,7 @@ tagsInput.directive('tagsInput', ["$timeout","$document","tagsInputConfig", func
                   .on('keydown', function(e) {
                     $scope.events.trigger('input-keydown', e);
                   })
-                  .on('click focus', function(e) {
+                  .on('click', function(e) {
                     $scope.events.trigger('show-autocomplete', e);
                   });
                 return {
