@@ -167,11 +167,15 @@ tagsInput.directive('autoComplete', function($document, $timeout, $sce, tagsInpu
                     suggestionList.reset();
                 })
                 .on('input-change', function(value) {
-                    if (value) {
-                        suggestionList.load(value, tagsInput.getTags());
-                    } else {
-                        suggestionList.reset();
-                    }
+                  if (value) {
+                    suggestionList.load(value, tagsInput.getTags());
+                  } else {
+                    suggestionList.reset();
+                  }
+                })
+                .on('show-autocomplete', function(value) {
+                    suggestionList.load('', tagsInput.getTags());
+                    scope.$apply()
                 })
                 .on('input-keydown', function(e) {
                     var key, handled;

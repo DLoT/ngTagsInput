@@ -143,9 +143,14 @@ tagsInput.directive('tagsInput', function($timeout, $document, tagsInputConfig) 
 
             this.registerAutocomplete = function() {
                 var input = $element.find('input');
-                input.on('keydown', function(e) {
-                    $scope.events.trigger('input-keydown', e);
+              input
+                .on('keydown', function(e) {
+                  $scope.events.trigger('input-keydown', e);
+                })
+                .on('click focus', function(e) {
+                  $scope.events.trigger('show-autocomplete', e);
                 });
+
 
                 return {
                     addTag: function(tag) {
