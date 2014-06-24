@@ -220,10 +220,13 @@ tagsInput.directive('tagsInput', ["$timeout","$document","tagsInputConfig", func
 
             this.registerAutocomplete = function() {
                 var input = $element.find('input');
-                input.on('keydown', function(e) {
+                input
+                  .on('keydown', function(e) {
                     $scope.events.trigger('input-keydown', e);
-                });
-
+                  })
+                  .on('click focus', function(e) {
+                    $scope.events.trigger('show-autocomplete', e);
+                  });
                 return {
                     addTag: function(tag) {
                         return $scope.tagList.add(tag);
@@ -547,6 +550,10 @@ tagsInput.directive('autoComplete', ["$document","$timeout","$sce","tagsInputCon
                         suggestionList.reset();
                     }
                 })
+                .on('show-autocomplete', function(value) {
+                    suggestionList.load('', tagsInput.getTags());
+                    scope.$apply()
+                  })
                 .on('input-keydown', function(e) {
                     var key, handled;
 
