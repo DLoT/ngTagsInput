@@ -76,8 +76,7 @@ describe('tags-input directive', function() {
 
         input.trigger(event);
         if (!event.isDefaultPrevented()) {
-            input.val(input.val() + String.fromCharCode(charCode));
-            input.trigger('input');
+            changeInputValue(input.val() + String.fromCharCode(charCode));
         }
     }
 
@@ -93,12 +92,23 @@ describe('tags-input directive', function() {
         if (!event.isDefaultPrevented()) {
             var input = getInput();
             var value = input.val();
-            input.val(value.substr(0, value.length - 1));
-            input.trigger('input');
+            changeInputValue(value.substr(0, value.length - 1));
         }
     }
 
+    function changeInputValue(value) {
+        changeElementValue(getInput(), value);
+    }
+
     describe('basic features', function() {
+        it('initializes the model as an empty array', function() {
+            // Arrange/Act
+            compile();
+
+            // Assert
+            expect($scope.tags).toEqual([]);
+        });
+
         it('renders the correct number of tags', function() {
             // Arrange
             $scope.tags = [
@@ -214,7 +224,7 @@ describe('tags-input directive', function() {
             newTag('Foo');
 
             // Act
-            getInput().val('foo').trigger('input');
+            changeInputValue('foo');
 
             // Assert
             expect(getInput()).not.toHaveClass('invalid-tag');
@@ -244,6 +254,18 @@ describe('tags-input directive', function() {
                 { text: 'Item2' },
                 { text: 'Item3' }
             ]);
+        });
+
+        it('does not add an empty tag', function() {
+            // Arrange
+            compile('min-length="0"', 'allowed-tags-pattern=".*"');
+
+            // Act
+            newTag('');
+
+            // Assert
+            expect($scope.tags).toEqual([]);
+            expect(isolateScope.newTag.invalid).toBeFalsy();
         });
     });
 
@@ -325,6 +347,14 @@ describe('tags-input directive', function() {
 
             // Assert
             expect(getInput().attr('tabindex')).toBe('1');
+        });
+
+        it('initializes the option to null', function() {
+            // Arrange/Act
+            compile();
+
+            // Assert
+            expect(isolateScope.options.tabindex).toBeNull();
         });
     });
 
@@ -507,8 +537,36 @@ describe('tags-input directive', function() {
         });
     });
 
+    describe('type option', function() {
+        it('sets the input\'s type property', function() {
+            SUPPORTED_INPUT_TYPES.forEach(function(type) {
+                // Arrange/Act
+                compile('type="' + type + '"');
+
+                // Assert
+                expect(getInput().attr('type')).toBe(type);
+            });
+        });
+
+        it('initializes the option to "text"', function() {
+            // Arrange/Act
+            compile();
+
+            // Assert
+            expect(isolateScope.options.type).toBe('text');
+        });
+
+        it('falls back to "text" when unsupported values are provided', function() {
+            // Arrange/Act
+            compile('type="datetime"');
+
+            // Assert
+            expect(getInput().attr('type')).toBe('text');
+        });
+    });
+
     describe('placeholder option', function() {
-        it('sets the input field placeholder text', function() {
+        it('sets the input\'s placeholder text', function() {
             // Arrange/Act
             compile('placeholder="New tag"');
 
@@ -646,12 +704,12 @@ describe('tags-input directive', function() {
     });
 
     describe('max-length option', function() {
-        it('initializes the option to undefined', function() {
+        it('initializes the option to MAX_SAFE_INTEGER', function() {
             // Arrange/Act
             compile();
 
             // Assert
-            expect(isolateScope.options.maxLength).toBeUndefined();
+            expect(isolateScope.options.maxLength).toBe(MAX_SAFE_INTEGER);
         });
 
         it('adds a new tag if the input length is less than the max-length option', function() {
@@ -787,12 +845,12 @@ describe('tags-input directive', function() {
     });
 
     describe('min-tags option', function() {
-        it('initializes the option to undefined', function() {
+        it('initializes the option to 0', function() {
             // Arrange/Act
             compile();
 
             // Assert
-            expect(isolateScope.options.minTags).toBeUndefined();
+            expect(isolateScope.options.minTags).toBe(0);
         });
 
         it('makes the element invalid when the number of tags is less than the min-tags option', function() {
@@ -833,16 +891,33 @@ describe('tags-input directive', function() {
             expect($scope.form.tags.$valid).toBe(true);
             expect($scope.form.tags.$error.minTags).toBe(false);
         });
+
+        it('re-validates the element when the min-tags option changes', function() {
+            // Arrange
+            compileWithForm('min-tags="2"', 'name="tags"');
+
+            $scope.tags = generateTags(2);
+            $scope.$digest();
+
+            // Act
+            isolateScope.options.minTags = 3;
+            isolateScope.events.trigger('option-change', { name: 'minTags' });
+            $scope.$digest();
+
+            // Assert
+            expect($scope.form.tags.$invalid).toBe(true);
+            expect($scope.form.tags.$error.minTags).toBe(true);
+        });
     });
 
 
     describe('max-tags option', function() {
-        it('initializes the option to undefined', function() {
+        it('initializes the option to MAX_SAFE_INTEGER', function() {
             // Arrange/Act
             compile();
 
             // Assert
-            expect(isolateScope.options.maxTags).toBeUndefined();
+            expect(isolateScope.options.maxTags).toBe(MAX_SAFE_INTEGER);
         });
 
         it('makes the element invalid when the number of tags is greater than the max-tags option', function() {
@@ -882,6 +957,23 @@ describe('tags-input directive', function() {
             // Assert
             expect($scope.form.tags.$valid).toBe(true);
             expect($scope.form.tags.$error.maxTags).toBe(false);
+        });
+
+        it('re-validates the element when the max-tags option changes', function() {
+            // Arrange
+            compileWithForm('max-tags="2"', 'name="tags"');
+
+            $scope.tags = generateTags(2);
+            $scope.$digest();
+
+            // Act
+            isolateScope.options.maxTags = 1;
+            isolateScope.events.trigger('option-change', { name: 'maxTags' });
+            $scope.$digest();
+
+            // Assert
+            expect($scope.form.tags.$invalid).toBe(true);
+            expect($scope.form.tags.$error.maxTags).toBe(true);
         });
     });
 
@@ -996,6 +1088,22 @@ describe('tags-input directive', function() {
             // Assert
             expect($scope.form.tags.$valid).toBe(true);
             expect($scope.form.tags.$error.leftoverText).toBe(false);
+        });
+
+        it('re-validates the element when the allow-leftover-text option changes', function() {
+            // Arrange
+            compileWithForm('allow-leftover-text="true"', 'name="tags"');
+            newTag('foo');
+            newTag('Foo');
+            isolateScope.events.trigger('input-blur');
+
+            // Act
+            isolateScope.options.allowLeftoverText = false;
+            isolateScope.events.trigger('option-change', { name: 'allowLeftoverText' });
+
+            // Assert
+            expect($scope.form.tags.$invalid).toBe(true);
+            expect($scope.form.tags.$error.leftoverText).toBe(true);
         });
     });
 
@@ -1120,6 +1228,7 @@ describe('tags-input directive', function() {
                 focusInput: jasmine.any(Function),
                 on: jasmine.any(Function),
                 getTags: jasmine.any(Function),
+                getCurrentTagText: jasmine.any(Function),
                 getOptions: jasmine.any(Function)
             });
         });
@@ -1138,7 +1247,7 @@ describe('tags-input directive', function() {
 
         it('empties the input field after a tag is added', function() {
             // Arrange
-            getInput().val('Tag').trigger('input');
+            changeInputValue('Tag');
 
             // Act
             autocompleteObj.addTag({ text: 'Tag' });
@@ -1167,6 +1276,15 @@ describe('tags-input directive', function() {
 
             // Act/Assert
             expect(autocompleteObj.getTags()).toEqual([{ text: 'Tag1' }, { text: 'Tag2' }]);
+        });
+
+        it('returns the current tag text', function() {
+            // Arrange
+            changeInputValue('ABC');
+            $scope.$digest();
+
+            // Act/Assert
+            expect(autocompleteObj.getCurrentTagText()).toBe('ABC');
         });
 
         it('returns the option list', function() {

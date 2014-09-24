@@ -1,18 +1,17 @@
 'use strict';
 
 describe('autoComplete directive', function() {
-    var $compile, $scope, $q, $timeout, $document,
+    var $compile, $scope, $q, $timeout,
         parentCtrl, element, isolateScope, suggestionList, deferred, tagsInput, eventHandlers;
 
     beforeEach(function() {
         module('ngTagsInput');
 
-        inject(function($rootScope, _$compile_, _$q_, _$timeout_, _$document_) {
+        inject(function($rootScope, _$compile_, _$q_, _$timeout_) {
             $scope = $rootScope;
             $compile = _$compile_;
             $q = _$q_;
             $timeout = _$timeout_;
-            $document = _$document_;
         });
 
         deferred = $q.defer();
@@ -34,6 +33,7 @@ describe('autoComplete directive', function() {
                 return this;
             }),
             getTags: jasmine.createSpy().and.returnValue([]),
+            getCurrentTagText: jasmine.createSpy(),
             getOptions: jasmine.createSpy().and.returnValue({
                 displayProperty: 'text'
             })
@@ -101,8 +101,9 @@ describe('autoComplete directive', function() {
 
     function loadSuggestions(countOrItems, text) {
         var items = angular.isNumber(countOrItems) ? generateSuggestions(countOrItems) : countOrItems;
+        text = angular.isUndefined(text) ? 'foobar' : text;
 
-        suggestionList.load(text || 'foobar', tagsInput.getTags());
+        suggestionList.load(text, tagsInput.getTags());
         $timeout.flush();
         resolve(items);
     }
@@ -210,13 +211,14 @@ describe('autoComplete directive', function() {
             expect(isSuggestionsBoxVisible()).toBe(false);
         });
 
-        it('hides the suggestion box when the user clicks elsewhere on the page', function() {
+        it('hides the suggestion box when a tag is removed', function() {
             // Arrange
             suggestionList.show();
             $scope.$digest();
 
             // Act
-            $document.trigger('click');
+            eventHandlers['tag-removed']();
+            $scope.$digest();
 
             // Assert
             expect(isSuggestionsBoxVisible()).toBe(false);
@@ -406,18 +408,6 @@ describe('autoComplete directive', function() {
                 { text: 'Item3' }
             ]);
         });
-
-        it('removes the event listeners on the document when the scope is destroyed', function() {
-            // Arrange
-            compile();
-            spyOn($document, 'off');
-
-            // Arrange
-            $scope.$destroy();
-
-            // Assert
-            expect($document.off).toHaveBeenCalled();
-        });
     });
 
     describe('navigation through suggestions', function() {
@@ -484,13 +474,13 @@ describe('autoComplete directive', function() {
 
             it('adds the selected suggestion when a mouse click is triggered', function() {
                 // Arrange
-                getSuggestion(1).mouseenter();
+                suggestionList.selected = null;
 
                 // Act
-                getSuggestion(1).click();
+                getSuggestion(0).click();
 
                 // Assert
-                expect(tagsInput.addTag).toHaveBeenCalledWith({ text: 'Item2' });
+                expect(tagsInput.addTag).toHaveBeenCalledWith({ text: 'Item1' });
             });
 
             it('focuses the input field when a suggestion is added via a mouse click', function() {
@@ -657,6 +647,131 @@ describe('autoComplete directive', function() {
         });
     });
 
+    describe('load-on-down-arrow option', function() {
+        it('initializes the option to false', function() {
+           // Arrange
+            compile();
+
+            // Assert
+            expect(isolateScope.options.loadOnDownArrow).toBe(false);
+        });
+
+        describe('suggestion box is hidden', function() {
+            beforeEach(function() {
+                suggestionList.visible = false;
+            });
+
+            it('calls the load function passing the current tag text when the down arrow key is pressed and the option is true', function() {
+                // Arrange
+                compile('load-on-down-arrow="true"');
+                tagsInput.getCurrentTagText.and.returnValue('ABC');
+
+                // Act
+                sendKeyDown(KEYS.down);
+                $timeout.flush();
+
+                // Assert
+                expect($scope.loadItems).toHaveBeenCalledWith('ABC');
+            });
+
+            it('doesn\'t call the load function when the down arrow key is pressed and the option is false', function() {
+                compile('load-on-down-arrow="false"');
+
+                // Act
+                sendKeyDown(KEYS.down);
+                $timeout.flush();
+
+                // Assert
+                expect($scope.loadItems).not.toHaveBeenCalled();
+            });
+        });
+
+        describe('suggestion box is visible', function() {
+            it('doesn\'t call the load function when the down arrow key is pressed', function() {
+                // Arrange
+                compile('load-on-down-arrow="true"');
+                suggestionList.visible = true;
+
+                // Act
+                sendKeyDown(KEYS.down);
+                $timeout.flush();
+
+                // Assert
+                expect($scope.loadItems).not.toHaveBeenCalled();
+            });
+        });
+    });
+
+    describe('load-on-empty option', function(){
+        it('initialize the option to false', function(){
+            // Arrange/Act
+            compile();
+
+            // Assert
+            expect(isolateScope.options.loadOnEmpty).toBe(false);
+        });
+
+        it('calls the load function when the input field becomes empty and the option is true', function(){
+            // Arrange
+            compile('load-on-empty="true"');
+
+            // Act
+            changeInputValue('');
+            $timeout.flush();
+
+            // Assert
+            expect($scope.loadItems).toHaveBeenCalledWith('');
+        });
+
+        it('doesn\'t call the load function when the input field becomes empty and the option is false', function(){
+            // Arrange
+            compile('load-on-empty="false"');
+
+            // Act
+            changeInputValue('');
+            $timeout.flush();
+
+            // Assert
+            expect($scope.loadItems).not.toHaveBeenCalled();
+        });
+    });
+
+    describe('load-on-focus option', function() {
+        it('initializes the option to false', function() {
+            // Arrange/Act
+            compile();
+
+            // Assert
+            expect(isolateScope.options.loadOnFocus).toBe(false);
+        });
+
+        it('calls the load function when the input element gains focus and the option is true', function() {
+            // Arrange
+            compile('load-on-focus="true"');
+            tagsInput.getCurrentTagText.and.returnValue('ABC');
+
+            // Act
+            eventHandlers['input-focus']();
+            $timeout.flush();
+
+            // Assert
+            expect($scope.loadItems).toHaveBeenCalledWith('ABC');
+        });
+
+        it('doesn\' call the load function when the input element gains focus and the option is false', function() {
+            // Arrange
+            compile('load-on-focus="false"');
+            tagsInput.getCurrentTagText.and.returnValue('ABC');
+
+            // Act
+            eventHandlers['input-focus']();
+            $timeout.flush();
+
+            // Assert
+            expect($scope.loadItems).not.toHaveBeenCalled();
+        });
+    });
+
     describe('debounce-delay option', function() {
         it('initializes the option to 100 milliseconds', function() {
             // Arrange/Act
@@ -803,7 +918,28 @@ describe('autoComplete directive', function() {
             expect(getSuggestionText(0)).toBe('<em>a**b++c..</em>');
         });
 
-        it('doesn\'t highlight the matched text in the suggestions list whe the option is false', function() {
+        it('doesn\'t highlight anything when the matching text is empty', function() {
+            // Arrange
+            compile('highlight-matched-text="true"', 'min-length="0"');
+
+            // Act
+            loadSuggestions([
+                { text: 'a' },
+                { text: 'ab' },
+                { text: 'ba' },
+                { text: 'aba' },
+                { text: 'bab' }
+            ], '');
+
+            // Assert
+            expect(getSuggestionText(0)).toBe('a');
+            expect(getSuggestionText(1)).toBe('ab');
+            expect(getSuggestionText(2)).toBe('ba');
+            expect(getSuggestionText(3)).toBe('aba');
+            expect(getSuggestionText(4)).toBe('bab');
+        });
+
+        it('doesn\'t highlight the matched text in the suggestions list when the option is false', function() {
             // Arrange
             compile('highlight-matched-text="false"', 'min-length="1"');
 
